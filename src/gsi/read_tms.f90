@@ -473,17 +473,11 @@ subroutine read_tms(mype,val_tovs,ithin,isfcalc,&
        
         do i = 1,12
            call upftbv(lnbufr,'TMSF',flags(i),mxib,ibit,nib)
-           if (flags(i) == 64) then
-             do j = 1,nib
-              write(1238,*) flags(i),ibit(j),j
-             end do
-           end if
            if (nib > 0 )then
              do j=1,nib
                if (ibit(j) == 23) then !v1 before 12/3/2025
                !if (ibit(j) == 9) then 
                  qc_flag(i,iob) = 1
-                 write(1239,*) flags(i),ibit(j),j
                  n_bad=n_bad+1
                end if
              end do
@@ -495,11 +489,6 @@ subroutine read_tms(mype,val_tovs,ithin,isfcalc,&
 
 
         bt_save(1:nchanl,iob) = data1b8(1:nchanl)
-
-        ! Replace bad values using the qc_flag array
-        !where (qc_flag(1:nchanl, iob) == 1)
-        !    bt_save(1:nchanl, iob) = missing_value
-        !end where
 
 
         iob=iob+1
@@ -722,8 +711,6 @@ subroutine read_tms(mype,val_tovs,ithin,isfcalc,&
      if (tms_qcflag) then
        do i=1,nchanl
           data_all(nreal-nchanl+i,itx)=qc_flag(i,iob)
-          !write(1234,*)i,itx,data_all(nreal-nchanl+i,itx)
-          !write(1235,*)i,iob, qc_flag(i,iob)
        end do
      end if  
 
