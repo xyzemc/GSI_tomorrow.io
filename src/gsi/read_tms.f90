@@ -457,12 +457,12 @@ subroutine read_tms(mype,val_tovs,ithin,isfcalc,&
       ! if(ifov <= nadir)  lza=-lza    ! emily check here
 
         panglr=scanang*deg2rad        
-        write(6,'(a28, 2x, i6, 2x, 2(f12.5,2x))') &
-             'READ_TMS ifov lza panglr ', ifov, abs(lza)*rad2deg, panglr*rad2deg
+        !write(6,'(a28, 2x, i6, 2x, 2(f12.5,2x))') &
+        !     'READ_TMS ifov lza panglr ', ifov, abs(lza)*rad2deg, panglr*rad2deg
 
         if(abs(lza)*rad2deg > MAX_SENSOR_ZENITH_ANGLE) then  ! MAX_SENSOR_ZENITH_ANGLE = 80
-           write(6,'(a28, 2x, i6, 2x, 2(f12.5,2x))') &
-                'READ_TMS WARNING lza error ',ifov, abs(lza)*rad2deg, panglr*rad2deg
+        !   write(6,'(a28, 2x, i6, 2x, 2(f12.5,2x))') &
+        !        'READ_TMS WARNING lza error ',ifov, abs(lza)*rad2deg, panglr*rad2deg
            cycle read_loop
         end if
 
