@@ -2792,9 +2792,7 @@ contains
                  call nc_diag_metadata_to_single("Observation",tb_obs0(ich_diag(i))  )     ! observed brightness temperature (K)
                  call nc_diag_metadata_to_single("Obs_Minus_Forecast_unadjusted",tbcnob(ich_diag(i))   )     ! observed - simulated Tb with no bias correction (K)
                  call nc_diag_metadata_to_single("Obs_Minus_Forecast_adjusted",tbc0(ich_diag(i)   )  )     ! observed - simulated Tb with bias corrrection (K)
-                 !errinv = sqrt(varinv0(ich_diag(i)))
-                 !xyz
-                 errinv = error0(ich_diag(i))
+                 errinv = sqrt(varinv0(ich_diag(i)))
                  call nc_diag_metadata_to_single("Inverse_Observation_Error",errinv           )
                  call nc_diag_metadata_to_single("Obs_Cloud_Effect",cldeff_obs(ich_diag(i))           )
                  call nc_diag_metadata_to_single("Bkg_Cloud_Effect",cldeff_fg(ich_diag(i))         )

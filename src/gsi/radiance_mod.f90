@@ -589,7 +589,7 @@ contains
           match=index(trim(obstype),trim(rad_type_info(i)%rtype)) /= 0
        end if
        if (match) then
-          if (mype==0) write(6,*) 'radiance_obstype_search: obstype=',obstype, &
+         if (mype==0) write(6,*) 'radiance_obstype_search: obstype=',obstype, &
                                  ' rtype=',rad_type_info(i)%rtype
           radmod%rtype = rad_type_info(i)%rtype
           radmod%nchannel = rad_type_info(i)%nchannel
@@ -768,6 +768,7 @@ contains
 
        obs_found=.false.
        do i=1,total_rad_type
+          ! Guard: If the match is 'tms' but the sensor must be 'tms', can not be 'atms'.
           if (trim(obsname) == 'tms' ) then
              if (trim(rad_type_info(i)%rtype) == trim(obsname) ) then
                 obs_found = .true.
@@ -777,8 +778,6 @@ contains
                 obs_found = .true.
              end if
           end if
-             ! Guard: If the match is 'tms' but the sensor is 'atms', skip it.
-             !if (trim(obsname) == 'tms' .and. trim(rad_type_info(i)%rtype) == 'atms') then
           if (obs_found) then
              if (mype==0) write(6,*) 'xyz obs_found ', i, ' ', rad_type_info(i)%rtype, ' - ', obsname,' ',ex_obserr
              istr=i

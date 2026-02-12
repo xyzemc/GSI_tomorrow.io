@@ -2166,10 +2166,6 @@ subroutine call_crtm(obstype,obstime,data_s,nchanl,nreal,ich, &
                  if (cloud_cont(k,ii) >= 1.0e-6_r_kind) hwp_guess(ii) = hwp_guess(ii) +  cloud_cont(k,ii)        
               enddo
 
-!             clw_guess = clw_guess +  cloud_cont(k,1)
-!xyz              clw_guess = zero
-!xyz              clw_guess = clw_guess +  cloud_cont(k,1)
-!xyz             ciw_guess = ciw_guess +  cloud_cont(k,2)
               if (cloud_cont(k,2) >= 1.0e-6_r_kind) ciw_guess = ciw_guess +  cloud_cont(k,2)        
               if (cloud_cont(k,3) >= 1.0e-6_r_kind) rain_guess = rain_guess +  cloud_cont(k,3)        
               if (cloud_cont(k,4) >= 1.0e-6_r_kind) snow_guess = snow_guess +  cloud_cont(k,4)        
@@ -2216,7 +2212,6 @@ subroutine call_crtm(obstype,obstime,data_s,nchanl,nreal,ich, &
            end if
         endif
      endif
-     !x if (clw_guess >0.) write(*,*) "debug_clw_guess", clw_guess
   
 !    Add in a drop-off to absorber amount in the stratosphere to be in more
 !    agreement with ECMWF profiles.  The drop-off is removed when climatological CO2 fields
