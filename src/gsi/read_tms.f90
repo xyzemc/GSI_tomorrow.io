@@ -179,7 +179,7 @@ subroutine read_tms(mype,val_tovs,ithin,isfcalc,&
   integer(i_kind),pointer :: it_mesh => null()
 
   real(r_double),dimension(12):: flags !xzhang
-  integer(i_kind), ALLOCATABLE, TARGET :: qc_flag(:,:) !xzhang
+  integer(i_kind), ALLOCATABLE, TARGET :: qc_flag(:,:),AscDesc_flag(:,:) !xzhang
   real(r_double), parameter    :: Missing_Value=1.e11_r_double !xzhang
   logical :: tms_qcflag=.true. !xzhang
   integer(i_kind),parameter:: mxib=100
@@ -286,7 +286,8 @@ subroutine read_tms(mype,val_tovs,ithin,isfcalc,&
   nchanl=12
   if(dval_use) maxinfo = maxinfo+2
   nreal = maxinfo + nstinfo
-  if(tms_qcflag) nreal = maxinfo+nstinfo+nchanl
+  !if(tms_qcflag) nreal = maxinfo+nstinfo+nchanl
+  if(tms_qcflag) nreal = maxinfo+nstinfo+nchanl+nchanl !for store the AscDesc_flag
   nele  = nreal   + nchanl
   allocate(data_all(nele,itxmax),nrec(itxmax))
   nrec=999999
@@ -357,8 +358,10 @@ subroutine read_tms(mype,val_tovs,ithin,isfcalc,&
   ALLOCATE(solazi_save(maxobs)) 
   ALLOCATE(bt_save(max_chanl,maxobs))
   ALLOCATE(qc_flag(max_chanl,maxobs))
+  ALLOCATE(AscDesc_flag(max_chanl,maxobs))
 
   qc_flag=0
+  AscDesc_flag=0
 ! Read in data from bufr into arrays first      
 ! Open unit to satellite bufr file
   iob=1
@@ -476,9 +479,10 @@ subroutine read_tms(mype,val_tovs,ithin,isfcalc,&
            if (nib > 0 )then
              do j=1,nib
                if (ibit(j) == 23) then !v1 before 12/3/2025
-               !if (ibit(j) == 9) then 
                  qc_flag(i,iob) = 1
                  n_bad=n_bad+1
+               else if (ibit(j) == 12) then 
+                 AscDesc_flag(i,iob) = 1 !ascending
                end if
              end do
            end if
@@ -710,6 +714,7 @@ subroutine read_tms(mype,val_tovs,ithin,isfcalc,&
 
      if (tms_qcflag) then
        do i=1,nchanl
+          data_all(nreal-2*nchanl+i,itx)=AscDesc_flag(i,iob)
           data_all(nreal-nchanl+i,itx)=qc_flag(i,iob)
        end do
      end if  
@@ -738,6 +743,7 @@ subroutine read_tms(mype,val_tovs,ithin,isfcalc,&
   DEALLOCATE(solazi_save) 
   DEALLOCATE(bt_save)
   DEALLOCATE(qc_flag)
+  DEALLOCATE(AscDesc_flag)
 
   call combine_radobs(mype_sub,mype_root,npe_sub,mpi_comm_sub,&
        nele,itxmax,nread,ndata,data_all,score_crit,nrec)

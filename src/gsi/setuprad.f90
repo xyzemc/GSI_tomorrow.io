@@ -305,7 +305,8 @@ contains
   use correlated_obsmod, only: corr_adjust_jacobian, idnames
   use radiance_mod, only: rad_obs_type,radiance_obstype_search,radiance_ex_obserr,radiance_ex_biascor
   use sparsearr, only: sparr2, new, writearray, size, fullarray
-  use radiance_mod, only: radiance_ex_obserr_gmi,radiance_ex_biascor_gmi,radiance_ex_obserr_tms
+  use radiance_mod, only: radiance_ex_obserr_gmi,radiance_ex_biascor_gmi
+  use radiance_mod, only: radiance_ex_obserr_tms,radiance_ex_biascor_tms
   use cads, only: cads_imager_calc
 
   use, intrinsic :: ieee_arithmetic
@@ -453,7 +454,7 @@ contains
   real(r_kind),dimension(2,nobs)   :: imager_chan_stdev, imager_model_bt
 
 ! variables added for TMS
-  integer(i_kind),dimension(nchanl):: qcflag !xzhang
+  integer(i_kind),dimension(nchanl):: qcflag, AscDescflag !xzhang
   logical :: tms_qcflag=.true. !xzhang
 
 ! Notations in use: for a single obs. or a single obs. type
@@ -1340,6 +1341,9 @@ contains
 !          end if
            else if (radmod%ex_obserr=='ex_obserr3') then
               call radiance_ex_biascor_gmi(radmod,clw_obs,clw_guess_retrieval,nchanl,cld_rbc_idx)
+           !xyz tms
+           else if (radmod%ex_obserr=='ex_obserr4') then   
+              call radiance_ex_biascor_tms(radmod,nchanl,cldeff_obs,cldeff_fg,cld_rbc_idx)
            end if
 
            if (ierrret /= 0) then
@@ -2775,6 +2779,7 @@ contains
 
                  call nc_diag_metadata_to_single("lsi_obs",lsi                               )
                  call nc_diag_metadata_to_single("isi_obs",isi                               )
+                 call nc_diag_metadata_to_single("cld_rbc_idx",cld_rbc_idx(i)                )
 
                  if (nstinfo==0) then
                     data_s(itref,n)  = missing
@@ -2789,11 +2794,14 @@ contains
                  call nc_diag_metadata_to_single("SST_dTz_dTfound",data_s(itz_tr,n)              )       ! d(Tz)/d(Tr)
 
                  if (tms .and. tms_qcflag) call nc_diag_metadata("QC_Flag_TMS",qcflag(ich_diag(i))  )     ! observed brightness temperature (K)
+                 if (tms .and. tms_qcflag) call nc_diag_metadata("AscDesc_Flag_TMS",AscDescflag(ich_diag(i))  )  
                  call nc_diag_metadata_to_single("Observation",tb_obs0(ich_diag(i))  )     ! observed brightness temperature (K)
                  call nc_diag_metadata_to_single("Obs_Minus_Forecast_unadjusted",tbcnob(ich_diag(i))   )     ! observed - simulated Tb with no bias correction (K)
                  call nc_diag_metadata_to_single("Obs_Minus_Forecast_adjusted",tbc0(ich_diag(i)   )  )     ! observed - simulated Tb with bias corrrection (K)
                  errinv = sqrt(varinv0(ich_diag(i)))
                  call nc_diag_metadata_to_single("Inverse_Observation_Error",errinv           )
+                 errinv = error0(ich_diag(i))
+                 call nc_diag_metadata_to_single("Observation_Error",errinv           )
                  call nc_diag_metadata_to_single("Obs_Cloud_Effect",cldeff_obs(ich_diag(i))           )
                  call nc_diag_metadata_to_single("Bkg_Cloud_Effect",cldeff_fg(ich_diag(i))         )
 
