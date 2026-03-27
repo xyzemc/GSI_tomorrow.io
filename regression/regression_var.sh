@@ -30,18 +30,15 @@ else
 fi
 
 # Determine the machine
-if [[ -d /scratch1 ]]; then # Hera
-  export machine="Hera"
-elif [[ -d /mnt/lfs4 || -d /jetmon || -d /mnt/lfs5 ]]; then # Jet
-  export machine="Jet"
-elif [[ -d /discover ]]; then # NCCS Discover
-  export machine="Discover"
-elif [[ -d /gpfs/f5 ]]; then # GaeaC5
-  export machine="gaeac5"
+if [[ -d /scratch3 ]]; then # Hera or Ursa
+  mount=$(findmnt -n -o SOURCE /home)
+  if [[ ${mount} =~ "ursa" ]]; then
+    export machine="Ursa"
+  else
+    export machine="Hera"
+  fi
 elif [[ -d /gpfs/f6 ]]; then # GaeaC6
   export machine="gaeac6"
-elif [[ -d /data/prod ]]; then # S4
-  export machine="S4"
 elif [[ -d /work ]]; then # Orion or Hercules
   mount=$(findmnt -n -o SOURCE /home)
   if [[ ${mount} =~ "hercules" ]]; then
@@ -55,29 +52,25 @@ elif [[ -d /lfs/h2 ]]; then # wcoss2 or acorn
   else
     export machine="wcoss2"
   fi
+elif [[ ! -z "${PW_CSP:+x}" ]]; then # noaacloud
+   case "${PW_CSP}" in
+      "aws" | "google" | "azure")
+        export machine="noaacloud"
+        ;;
+   esac
 fi
 echo "Running Regression Tests on '$machine'";
 
 case $machine in
-  gaeac5)
-    export queue="normal"
-    export group="ufs-ard"
-    export noscrub="/gpfs/f5/${group}/scratch/${USER}/$LOGNAME/gsi_tmp/noscrub"
-    export ptmp="/gpfs/f5/${group}/scratch/${USER}/$LOGNAME/gsi_tmp/ptmp"
-    export casesdir="/gpfs/f5/ufs-ard/world-shared/GSI_data/CASES/regtest"
-
-    export check_resource="no"
-    export accnt="ufs-ard"
-  ;;
   gaeac6)
     export queue="normal"
-    export group="bil-fire8"
+    export group="ira-sti"
     export noscrub="/gpfs/f6/${group}/scratch/${USER}/${LOGNAME}/gsi_tmp/noscrub"
     export ptmp="/gpfs/f6/${group}/scratch/${USER}/${LOGNAME}/gsi_tmp/ptmp"
-    export casesdir="/gpfs/f6/bil-fire8/world-shared/GSI_data/CASES/regtest"
+    export casesdir="/gpfs/f6/ira-sti/world-shared/Russ.Treadon/CASES/regtest"
 
     export check_resource="no"
-    export accnt="bil-fire8"
+    export accnt="ira-sti"
   ;;
   wcoss2 | acorn)
       export local_or_default="${local_or_default:-/lfs/h2/emc/da/noscrub/$LOGNAME}"
@@ -94,11 +87,11 @@ case $machine in
       fi
       export ptmp="${ptmp:-/lfs/h2/emc/ptmp/$LOGNAME/$ptmpName}"
 
-      export casesdir="/lfs/h2/emc/da/noscrub/russ.treadon/CASES/regtest"
+      export casesdir="/lfs/h2/emc/global/noscrub/russ.treadon/CASES/regtest"
 
       export check_resource="no"
       export accnt="${accnt:-GFS-DEV}"
-  ;;      
+  ;;
   Orion | Hercules)
       export local_or_default="${local_or_default:-/work/noaa/da/$LOGNAME}"
       if [ -d $local_or_default ]; then
@@ -119,33 +112,33 @@ case $machine in
       if [[ "$cmaketest" = "false" ]]; then
          export basedir="/work/noaa/da/$LOGNAME/gsi"
       fi
-      export ptmp="${ptmp:-/work/noaa/stmp/$LOGNAME/$ptmpName}"
+      export ptmp="${ptmp:-/work/noaa/stmp/$LOGNAME/${machine}/$ptmpName}"
 
       export casesdir="/work/noaa/da/rtreadon/CASES/regtest"
 
       export check_resource="no"
       export accnt="${accnt:-da-cpu}"
-  ;;      
+  ;;
   Hera)
 
-    export local_or_default="${local_or_default:-/scratch1/NCEPDEV/da/$LOGNAME}"
+    export local_or_default="${local_or_default:-/scratch3/NCEPDEV/da/$LOGNAME}"
     if [ -d $local_or_default ]; then
       export noscrub="$local_or_default/noscrub"
-    elif [ -d /scratch1/NCEPDEV/global/$LOGNAME ]; then
-      export noscrub="/scratch1/NCEPDEV/global/$LOGNAME/noscrub"
-     elif [ -d /scratch2/BMC/gsienkf/$LOGNAME ]; then
-      export noscrub="/scratch2/BMC/gsienkf/$LOGNAME"
+    elif [ -d /scratch3/NCEPDEV/global/$LOGNAME ]; then
+      export noscrub="/scratch3/NCEPDEV/global/$LOGNAME/noscrub"
+     elif [ -d /scratch4/BMC/gsienkf/$LOGNAME ]; then
+      export noscrub="/scratch4/BMC/gsienkf/$LOGNAME"
     fi
 
     export group="${group:-global}"
     export queue="${queue:-batch}"
     if [[ "$cmaketest" = "false" ]]; then
-      export basedir="/scratch1/NCEPDEV/da/$LOGNAME/git/gsi"
+      export basedir="/scratch3/NCEPDEV/da/$LOGNAME/git/gsi"
     fi
 
-    export ptmp="${ptmp:-/scratch1/NCEPDEV/stmp2/$LOGNAME/$ptmpName}"
+    export ptmp="${ptmp:-/scratch3/NCEPDEV/stmp/$LOGNAME/${machine}/$ptmpName}"
 
-    export casesdir="/scratch1/NCEPDEV/da/Russ.Treadon/CASES/regtest"
+    export casesdir="/scratch3/NCEPDEV/da/Russ.Treadon/CASES/regtest"
 
     export check_resource="no"
     export accnt="${accnt:-da-cpu}"
@@ -154,38 +147,47 @@ case $machine in
     #  After completion of regression tests, will remove the regression test subdirecories
     export clean=".false."
   ;;
-  Jet)
+  Ursa)
 
-    export noscrub=/lfs5/NESDIS/nesdis-rdo2/$LOGNAME/noscrub
-    export ptmp=/lfs5/NESDIS/nesdis-rdo2/$LOGNAME/ptmp
-    export casesdir="/lfs5/NESDIS/nesdis-rdo2/David.Huber/save/CASES/regtest"
-    export check_resource="no"
-    export accnt="nesdis-rdo2"
-
-    export group="global"
-    export queue="batch"
-    if [[ "$cmaketest" = "false" ]]; then
-      export basedir="/lfs5/NESDIS/nesdis-rdo2/$LOGNAME/save/git/gsi"
+    export local_or_default="${local_or_default:-/scratch3/NCEPDEV/da/$LOGNAME}"
+    if [ -d $local_or_default ]; then
+      export noscrub="$local_or_default/noscrub"
+    elif [ -d /scratch3/NCEPDEV/global/$LOGNAME ]; then
+      export noscrub="/scratch3/NCEPDEV/global/$LOGNAME/noscrub"
+     elif [ -d /scratch4/BMC/gsienkf/$LOGNAME ]; then
+      export noscrub="/scratch4/BMC/gsienkf/$LOGNAME"
     fi
 
-    #  On Jet, there are no scrubbers to remove old contents from stmp* directories.
+    export group="${group:-global}"
+    export queue="${queue:-batch}"
+    if [[ "$cmaketest" = "false" ]]; then
+      export basedir="/scratch3/NCEPDEV/da/$LOGNAME/git/gsi"
+    fi
+
+    export ptmp="${ptmp:-/scratch3/NCEPDEV/stmp/$LOGNAME/$ptmpName}"
+
+    export casesdir="/scratch3/NCEPDEV/da/Russ.Treadon/CASES/regtest"
+
+    export check_resource="no"
+    export accnt="${accnt:-da-cpu}"
+
+    #  On Ursa, there are no scrubbers to remove old contents from stmp* directories.
     #  After completion of regression tests, will remove the regression test subdirecories
-    export clean=".true."
-  ;;
-  Discover)
-    if [[ "$cmaketest" = "false" ]]; then
-        echo "Regression tests on Discover need to be run via ctest"
-        exit 1
-    fi
-    export ptmp=$basedir
-    export ptmp=$basedir
-    export noscrub=$basedir
-    export casesdir="/discover/nobackup/projects/gmao/obsdev/wrmccart/NCEP_regression/CASES"
-    export check_resource="no"
-    export accnt="g0613"
-    export queue="compute"
     export clean=".false."
   ;;
+  noaacloud)
+
+    export noscrub="${noscrub:-/contrib/$USER/noscrub}"
+    export group="${group:-$USER}"
+    export queue="${queue:-batch}"
+    export ptmp="${ptmp:-/lustre/$USER/ptmp}"
+    export casesdir="${casesdir:-/lustre/GSI_RTs}"
+    export partition="${partition:-compute}"
+    export check_resource="no"
+    export accnt="${accnt:-}"
+    export clean=".false."
+  ;;
+
   *)
     echo "Regression tests are not setup on '$machine', ABORT!"
     exit 1
@@ -205,7 +207,13 @@ export savdir="$ptmp"
 export JCAP="62"
 
 # Case Study analysis dates
-export global_adate="2024022300"
+if [[ "${machine}" == "noaacloud" ]]; then
+  # due to unavailable unrestricted versions of obs data 
+  # for 2024022300 noaacloud uses its own global date
+  export global_adate="2021122100"
+else
+  export global_adate="2024022300"
+fi
 export rtma_adate="2020022420"
 export rrfs_enkf_adate="2023061012"
 export rrfs_3denvar_rdasens_adate="2023061012"

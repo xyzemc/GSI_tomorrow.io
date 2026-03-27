@@ -39,6 +39,7 @@ implicit none
   private
 ! set routines used externally to public
   public :: calc_clw, ret_amsua, gmi_37pol_diff, calc_scat_index_tms !emily
+  public :: retrieval_amsr2
 
 contains
 

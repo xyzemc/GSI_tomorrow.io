@@ -1254,7 +1254,6 @@ contains
 ! !USES:
 
     use mpimod, only: mype
-    use constants, only: r10000
     implicit none
 
     integer(i_kind),optional, intent(in) :: pe_out
@@ -1275,11 +1274,7 @@ contains
           rewind lunout
           do jch=1,jpch_rad
              do i=1,npred
-                if (inew_rad(jch) .or. abs(ostats(jch)) .le. tiny(ostats(1))) then
-                   varx(i) = r10000
-                else
-                   varx(i)=varA(i,jch)
-                endif
+                varx(i)=varA(i,jch)
              end do
              write(lunout,'(I5,1x,A20,1x,I5,e15.7/2(4x,10e15.7/))') jch,nusis(jch),&
                   nuchan(jch),ostats(jch),(varx(ip),ip=1,npred)
@@ -1834,6 +1829,7 @@ contains
       if (satsens /= satsens_id) then
          write(6,'(''INIT_PREDX:  ***ERROR*** inconsistent satellite ids '',&
               '' fdiag_rad= '',a,'' satsens,satsens_id='')')trim(fdiag_rad),satsens,satsens_id
+         deallocate(ich)
          cycle loopf
       endif
 
@@ -1846,7 +1842,10 @@ contains
             sensor_end = j
          endif
       end do
-      if ( sensor_start == 0 ) cycle loopf
+      if ( sensor_start == 0 ) then
+        deallocate(ich)
+        cycle loopf
+      endif
 
 !     Extract satinfo relative index and get new_chan
       new_chan=0
@@ -1856,6 +1855,7 @@ contains
 !     do not use this diag* file
       if ( satsens(1:6) == 'seviri' .and. header_chan(1)%nuchan < 4) then
         call close_radiag(fdiag_rad,lndiag)
+        deallocate(ich)
         cycle loopf
       endif
 
@@ -1877,6 +1877,7 @@ contains
       write(6,*) 'INIT_PREDX: inst_sat  new_chan = ', trim(fdiag_rad), new_chan
       if (.not. update .and. new_chan==0) then 
          call close_radiag(fdiag_rad,lndiag)
+         deallocate(ich)
          cycle loopf
       end if
 
@@ -2080,6 +2081,7 @@ contains
       if (new_chan/=0) then
          if (all(iobs<nthreshold)) then
             deallocate(A,b,iobs,pred)
+            deallocate(ich)
             cycle loopf
          endif
 
@@ -2126,6 +2128,8 @@ contains
          deallocate(A,b)
          deallocate(iobs,pred)
       end if
+
+      deallocate(ich)
 
 !  End of loop over satellite/sensor types
    end do loopf

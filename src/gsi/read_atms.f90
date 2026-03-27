@@ -74,7 +74,7 @@ subroutine read_atms(mype,val_tovs,ithin,isfcalc,&
 !$$$
   use kinds, only: r_kind,r_double,i_kind
   use satthin, only: super_val,itxmax,makegrids,destroygrids,checkob, &
-      finalcheck,map2tgrid,score_crit
+      finalcheck,map2tgrid,score_crit,map2tgrid2,binit,itx_all
   use satthin, only: radthin_time_info,tdiff2crit
   use obsmod,  only: time_window_max, ta2tb
   use radinfo, only: iuse_rad,newchn,cbias,nusis,jpch_rad,air_rad,ang_rad, &
@@ -193,6 +193,9 @@ subroutine read_atms(mype,val_tovs,ithin,isfcalc,&
   real(r_kind)    :: ptime,timeinflat,crit0
   integer(i_kind) :: ithin_time,n_tbin
   integer(i_kind),pointer :: it_mesh => null()
+  integer(i_kind) :: good,bin,bin2,Obindx,maxPerBin,numBinsWithObs
+  integer(i_kind),allocatable,dimension(:)   :: binCount,binsWithObs,hash
+  integer(i_kind),allocatable,dimension(:,:) :: binObs
 
 !**************************************************************************
 ! Initialize variables
@@ -524,7 +527,9 @@ subroutine read_atms(mype,val_tovs,ithin,isfcalc,&
 
 ! Complete Read_ATMS thinning and QC steps
 
-  ObsLoop: do iob = 1, num_obs  
+! First scan to count how many obs fall in each bin.  Will use this info to allocate the binObs array
+! Consider removing all the "cycles" as that code is repeated several times
+  ObsLoop: do iob=1,num_obs
 
      rsat       => rsat_save(iob)
      t4dv       => t4dv_save(iob)
@@ -603,7 +608,181 @@ subroutine read_atms(mype,val_tovs,ithin,isfcalc,&
        ifovmod=ifov
      endif
 
-     nread=nread+nchanl
+ 
+!    Map obs to thinning grid or return immediately if ithin<=0
+     call binit(dlat_earth*deg2rad,dlon_earth*deg2rad,itx2,ithin,sis,it_mesh)
+     binCount(itx2) = binCount(itx2)+1
+  end do ObsLoop
+
+  maxPerBin=maxval(binCount)
+  numBinsWithObs = count(mask=binCount>0)
+
+  ! Find thinning bins with at least one observation
+  ! Packing those bins into a dense vector allows us to greatly reduce
+  ! memory useage for binObs
+  allocate(binsWithObs(numBinsWithObs))
+  binsWithObs = pack( (/ (i, i=1,size(binCount)) /), binCount > 0)
+
+  ! Map between physical bin index and Packed index
+  allocate(hash(itxmax))
+  hash=0
+  do bin = 1,numBinsWithObs
+    hash(binsWithObs(bin)) = bin
+  enddo
+
+  write(6,'("read_atms: max number of obs in any bin " I10)') maxPerBin
+  write(6,'("read_atms: number of bins with any obs " I10)') numBinsWithObs
+
+  allocate(binObs(maxPerBin,numBinsWithObs))
+  binObs(:,:)=0
+  binCount(:)=0
+
+  ! Reset itx_all counter held in the satthin module
+  itx_all=0
+
+  ! Second scan to place obs within the bins that actually have obs (binObs).
+  ! This is a space saving measure since otherwise we would need to allocate a MUCH larger array
+  ObsLoop2: do iob=1,num_obs
+
+     t4dv       => t4dv_save(iob)
+     dlon_earth => dlon_earth_save(iob)
+     dlat_earth => dlat_earth_save(iob)
+     it_mesh    => it_mesh_save(iob)
+     ifov       => ifov_save(iob)
+
+!    Regional case
+     if(regional)then
+        call tll2xy(dlon_earth*deg2rad,dlat_earth*deg2rad,dlon,dlat,outside)
+        if(diagnostic_reg) then
+           call txy2ll(dlon,dlat,dlon00,dlat00)
+           ntest=ntest+1
+           cdist=sin(dlat_earth*deg2rad)*sin(dlat00)+cos(dlat_earth*deg2rad)*cos(dlat00)* &
+                (sin(dlon_earth*deg2rad)*sin(dlon00)+cos(dlon_earth*deg2rad)*cos(dlon00))
+           cdist=max(-one,min(cdist,one))
+           disterr=acos(cdist)*rad2deg
+           disterrmax=max(disterrmax,disterr)
+        end if
+!       Check to see if in domain
+        if(outside) cycle ObsLoop2
+     endif
+
+!    Check time window
+     if (l4dvar.or.l4densvar) then
+        if (t4dv<zero .OR. t4dv>winlen) cycle ObsLoop2
+     else
+        tdiff=t4dv+(iwinbgn-gstime)*r60inv
+        if(abs(tdiff) > twind) cycle ObsLoop2
+     endif
+!
+!    Check FOV and scan-edge usage
+     if (.not. use_edges .and. (ifov < radedge_min .OR. ifov > radedge_max )) &
+          cycle ObsLoop2
+
+     if (maxscan < 96) then
+       ! For ATMS when using the old style satang files,
+       ! we shift the FOV number down by three as we can only use
+       ! 90 of the 96 positions right now because of the scan bias limitation.
+       ifovmod=ifov-3
+       ! Check that ifov is not out of range of cbias dimension
+       if (ifovmod < 1 .OR. ifovmod > 90) cycle ObsLoop2
+     else
+       ! This line is for consistency with previous treatment
+       if (ifov < 4 .OR. ifov > 93) cycle ObsLoop2
+       ifovmod=ifov
+     endif
+
+!    Map obs to thinning grid or return immediately if ithin<=0
+     call binit(dlat_earth*deg2rad,dlon_earth*deg2rad,itx2,ithin,sis,it_mesh)
+     binCount(itx2) = binCount(itx2)+1
+     binObs(binCount(itx2),hash(itx2)) = iob
+  end do ObsLoop2
+  deallocate(hash)
+
+  ! Reset itx_all counter held in the satthin module.  Not an issue as of 2025, but would
+  ! start to be a problem when an observation file contains more than 1/3 of itxmax observations
+  itx_all=0
+
+! Third scan to determine which observation in a given bin is best to use
+  good=0
+  !$omp parallel do default(none), schedule(dynamic,12), &
+  !$omp& firstprivate(ich1,ich2,ich3,ich16,ich17), &
+  !$omp& private(bin,score,bin2,Obindx,iob,rsat,t4dv,dlon_earth,dlat_earth,crit1,it_mesh,ifov,lza, &
+  !$omp&   satazi,solzen,solazi,bt_in,dlat_earth_deg,dlon_earth_deg, &
+  !$omp&   dlon,dlat,outside,dlon00,dlat00,cdist, &
+  !$omp&   disterr,disterrmax,tdiff,iuse,itt,itx,dist1, &
+  !$omp&   ifovmod,iskip,critical_channels_missing,j,valid,isflg,idomsfc, &
+  !$omp&   sfcpct,sty,vty,vfr,stp,sm,ff10,sfcr,zz,sn,ts,tsavg,pred,ch1,ch2,i, &
+  !$omp&   ch3,ch16,cosza,qval,d0,tt,tref,dtw,dtc,tz_tr,panglr) &
+  !$omp& shared(numBinsWithObs,binCount,binObs,deg2rad,rad2deg,rlats,rlons,nlat,nlon,iwinbgn,gstime,r60inv,ithin,sis, &
+  !$omp&   instr,ichan,expansion,ichan1,ichan2,ichan3,ichan16,ichan17,nadir,zob, &
+  !$omp&   val_tovs,num_obs,rsat_save,t4dv_save,dlon_earth_save,dlat_earth_save, &
+  !$omp&   crit1_save,it_mesh_save,ifov_save,lza_save,satazi_save,solzen_save, &
+  !$omp&   solazi_save,bt_save,regional,diagnostic_reg,l4dvar,l4densvar, &
+  !$omp&   winlen,twind,use_edges,radedge_min,radedge_max,maxscan,nchanl, &
+  !$omp&   isfcalc,rlndsea,adp_anglebc,newpc4pred,radmod,d1,d2,maxinfo, &
+  !$omp&   ang_rad,cbias,air_rad,nst_gsi,start,step,data_all,dval_use,nrec,nreal,score_crit,binsWithObs) &
+  !$omp& reduction(+:ntest,nread,good)
+  BinLoop: do bin = 1,numBinsWithObs
+
+     score=9.99e10_r_kind
+     bin2 = binsWithObs(bin)
+
+     ObsLoop3: do Obindx = 1,binCount(bin2)
+
+       iob        = binObs(Obindx,bin)
+       rsat       => rsat_save(iob)
+       t4dv       => t4dv_save(iob)
+       dlon_earth => dlon_earth_save(iob)
+       dlat_earth => dlat_earth_save(iob)
+       crit1      => crit1_save(iob)
+       it_mesh    => it_mesh_save(iob)
+       ifov       => ifov_save(iob)
+       lza        => lza_save(iob)
+       satazi     => satazi_save(iob)
+       solzen     => solzen_save(iob)
+       solazi     => solazi_save(iob)
+       bt_in      => bt_save(1:nchanl,iob)
+
+       dlat_earth_deg = dlat_earth
+       dlon_earth_deg = dlon_earth
+       dlat_earth = dlat_earth*deg2rad
+       dlon_earth = dlon_earth*deg2rad
+
+!      Regional case
+       if(regional)then
+          call tll2xy(dlon_earth,dlat_earth,dlon,dlat,outside)
+          if(diagnostic_reg) then
+             call txy2ll(dlon,dlat,dlon00,dlat00)
+             ntest=ntest+1
+             cdist=sin(dlat_earth)*sin(dlat00)+cos(dlat_earth)*cos(dlat00)* &
+                  (sin(dlon_earth)*sin(dlon00)+cos(dlon_earth)*cos(dlon00))
+             cdist=max(-one,min(cdist,one))
+             disterr=acos(cdist)*rad2deg
+             disterrmax=max(disterrmax,disterr)
+          end if
+       endif
+
+!      Map obs to thinning grid
+       !call map2tgrid(dlat_earth,dlon_earth,dist1,crit1,itx,ithin,itt,iuse,sis,it_mesh=it_mesh)
+       ! DSK: We already know which bin (itx) this observation resides in so no need to recalculate.
+       ! Could inline this map2tgrid2 call if I had local access to istart_val,glat,mlat,glon and mlon from satthin.
+       call map2tgrid2(dlat_earth,dlon_earth,dist1,crit1,itx,ithin,itt,iuse,sis,score,it_mesh)
+       if(.not. iuse) cycle ObsLoop3
+
+       if (maxscan < 96) then
+         ! For ATMS when using the old style satang files, 
+         ! we shift the FOV number down by three as we can only use
+         ! 90 of the 96 positions right now because of the scan bias limitation.
+         ifovmod=ifov-3
+         ! Check that ifov is not out of range of cbias dimension
+         !if (ifovmod < 1 .OR. ifovmod > 90) cycle ObsLoop3
+       else
+         ! This line is for consistency with previous treatment
+         !if (ifov < 4 .OR. ifov > 93) cycle ObsLoop3
+         ifovmod=ifov
+       endif
+
+       nread=nread+nchanl
      
 !    Transfer observed brightness temperature to work array.  If any
 !    temperature exceeds limits, reset observation to "bad" value
