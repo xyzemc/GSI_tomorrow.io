@@ -260,7 +260,7 @@ subroutine genstats_gps(bwork,awork,toss_gps_sub,conv_diagsave,mype)
   use jfunc, only: jiter,miter,jiterstart
   use gsi_4dvar, only: nobs_bins
   use convinfo, only: nconvtype
-  use m_gpsrhs, only: rdiagbuf 
+  use m_gpsrhs, only: rdiagbuf
   implicit none
 
 ! Declare passed variables
@@ -319,7 +319,7 @@ subroutine genstats_gps(bwork,awork,toss_gps_sub,conv_diagsave,mype)
   integer(i_kind) :: nnz, nind,nobs,total_size,ind,prof_size
   type(gps_ob_type), pointer:: gpsptr
   type(gps_all_ob_type), pointer:: gps_allptr
-  
+
   save_jacobian = conv_diagsave .and. jiter==jiterstart .and. lobsdiag_forenkf
 
 !*******************************************************************************

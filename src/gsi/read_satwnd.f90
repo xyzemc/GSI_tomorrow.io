@@ -1406,7 +1406,7 @@ end subroutine read_satwnd
       integer sattab(100,1000,7,2)
       integer goes(20)/731,732,733,734,735,250,251,252,253,254,255,256,257,258,259,270,271,272,273,000/
       integer insa(20)/430,431,432,450,451,452,410,470,000,000,000,000,000,000,000,000,000,000,000,000/
-      integer hima(20)/153,154,150,151,152,171,172,173,174,000,000,000,000,000,000,000,000,000,000,000/
+      integer hima(20)/153,154,150,151,152,171,172,173,174,253,000,000,000,000,000,000,000,000,000,000/
       integer meto(20)/058,059,050,051,052,053,054,055,056,057,070,071,000,000,000,000,000,000,000,000/
       integer modi(20)/783,784,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000/
       integer lege(20)/854,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000/
@@ -1525,6 +1525,11 @@ end subroutine read_satwnd
       do i=1,20
          if(goes(i)/=0) then
             sattab(099,goes(i),1,1)=241; sattab(099,goes(i),1,2)=20 ! MSG TYPE 005-099 CIMSS AMV TROPICAL CYCLONE WINDS
+            sattab(099,goes(i),2,1)=241; sattab(099,goes(i),2,2)=20 ! MSG TYPE 005-099 CIMSS AMV TROPICAL CYCLONE WINDS
+            sattab(099,goes(i),3,1)=241; sattab(099,goes(i),3,2)=20 ! MSG TYPE 005-099 CIMSS AMV TROPICAL CYCLONE WINDS
+            sattab(099,goes(i),4,1)=241; sattab(099,goes(i),4,2)=20 ! MSG TYPE 005-099 CIMSS AMV TROPICAL CYCLONE WINDS
+            sattab(099,goes(i),5,1)=241; sattab(099,goes(i),5,2)=20 ! MSG TYPE 005-099 CIMSS AMV TROPICAL CYCLONE WINDS
+            sattab(099,goes(i),6,1)=241; sattab(099,goes(i),6,2)=20 ! MSG TYPE 005-099 CIMSS AMV TROPICAL CYCLONE WINDS
          endif
          if(hima(i)/=0) then
             sattab(099,hima(i),1,1)=241; sattab(099,hima(i),1,2)=20 ! MSG TYPE 005-099 CIMSS AMV TROPICAL CYCLONE WINDS

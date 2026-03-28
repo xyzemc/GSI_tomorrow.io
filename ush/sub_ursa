@@ -1,4 +1,4 @@
-#!/bin/sh 
+#!/bin/sh --login
 set -x
 usage="\
 Usage:  $0 [options] executable [args]
@@ -88,7 +88,13 @@ output=${output:-$jobname.out}
 myuser=$LOGNAME
 myhost=$(hostname)
 
-DATA=$regdir/regtests/data
+if [ -d /scratch4/NCEPDEV/stmp/$LOGNAME ]; then
+  DATA=/scratch4/NCEPDEV/stmp/$LOGNAME/tmp
+elif [ -d /scratch4/BMC/gsienkf/$LOGNAME ]; then
+  DATA=/scratch4/BMC/gsienkf/$LOGNAME/tmp/tmp
+fi
+DATA=${DATA:-$ptmp/tmp}
+
 mkdir -p $DATA
 
 #partition=${partition:-c1ms}
@@ -107,36 +113,38 @@ threads=${rcpu:-1}
 export TZ=GMT
 cfile=$DATA/sub$$
 > $cfile
-echo "#!/bin/sh --login"                   >> $cfile
-echo ""                                    >> $cfile
-echo "#SBATCH --output $output"            >> $cfile
-echo "#SBATCH --job-name $jobname"         >> $cfile
-echo "#SBATCH --time=$timew"               >> $cfile
-echo "#SBATCH --ntasks=$procs"             >> $cfile
-echo "#SBATCH --nodes=$nodes"              >> $cfile
-echo "#SBATCH --account=$accnt"            >> $cfile
-echo "#SBATCH --constraint=hasw"           >> $cfile
-#echo "#SBATCH --qos=advda"                >> $cfile
-echo "#SBATCH --export=ALL"                >> $cfile
-echo "#SBATCH --partition=$queue"          >> $cfile
-#. $exec                                   >> $cfile
-#echo "/bin/sh -x $exec"                   >> $cfile
+#echo "#PBS -S /bin/sh"                     >> $cfile
+echo "#!/bin/sh --login"                                                           >> $cfile
+echo ""                                                                            >> $cfile
+echo "#SBATCH --output=$output"                                                    >> $cfile
+echo "#SBATCH --job-name=$jobname"                                                 >> $cfile
+echo "#SBATCH --qos=$queue"                                                        >> $cfile
+echo "#SBATCH --partition=u1-compute"                                              >> $cfile
+echo "#SBATCH --time=$timew"                                                       >> $cfile
+echo "#SBATCH --nodes=$nodes --ntasks-per-node=$procs --exclusive"    >> $cfile
+echo "#SBATCH --account=$accnt"                                                    >> $cfile
 
 echo "" >>$cfile
-echo "set -x"
-echo "" >>$cfile
-echo "export OMP_NUM_THREADS=$threads"     >> $cfile
+echo "set -x" >> $cfile
+echo " " >> $cfile
+echo "export OMP_NUM_THREADS=$threads"      >> $cfile
+echo "export ntasks=$(( $nodes * $procs ))" >> $cfile
+echo "export ppn=$procs"                    >> $cfile
+echo "export threads=$threads"              >> $cfile
 echo "" >>$cfile
 echo ". "$(awk '{ print $1, $2, $3, $4, $5, $6, $7, $8, $9 }' $regdir/regression_var.out)  >>$cfile
 echo "" >>$cfile
-echo "module use -a $modulefiles"   >> $cfile
-echo "module load gsi_discover.intel" >> $cfile
+
+echo "set +x" >> $cfile
+echo ". /apps/lmod/lmod/init/sh"                           >> $cfile
+echo "module purge"                                        >> $cfile
+echo "module use $modulefiles"                      >> $cfile
+echo "module load gsi_ursa.intel" >> $cfile
+echo "module list"                                         >> $cfile
 echo "" >>$cfile
-echo "jobname=$jobname" >>$cfile
-echo "" >>$cfile
+echo "set -x" >> $cfile
 
 cat $exec >> $cfile
-
 if [[ $nosub = YES ]];then
   cat $cfile
   exit
@@ -190,18 +198,18 @@ elif [[ $verbose = YES ]];then
   set -x
   cat $cfile
 fi
-qsub=${qsub:-qsub}
+sbatch=${sbatch:-sbatch}
 
 ofile=$DATA/subout$$
 >$ofile
 chmod 777 $ofile
-$qsub -V $cfile >$ofile
+$sbatch $cfile >$ofile
 rc=$?
 cat $ofile
 if [[ -w $SUBLOG ]];then
   jobn=$(grep -i submitted $ofile|head -n1|cut -d\" -f2)
   date -u +"%Y%m%d%H%M%S : $subcmd : $jobn" >>$SUBLOG
 fi
-#rm $cfile $ofile
-#[[ $MKDATA = YES ]] && rmdir $DATA
+##rm $cfile $ofile
+[[ $MKDATA = YES ]] && rmdir $DATA
 exit $rc
