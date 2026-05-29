@@ -923,6 +923,7 @@ contains
 !       Load tms qc flag into work array.
         if (tms .and. tms_qcflag) then
             qcflag(jc) = data_s(jc+nreal-12,n)
+            AscDescflag(jc) = data_s(jc+nreal-12*2,n)
             if (qcflag(jc) == 1 ) then
                id_qc(jc) = ifail_tms_overall_qc
                !print*, 'tms id_qc for overall is ', id_qc
