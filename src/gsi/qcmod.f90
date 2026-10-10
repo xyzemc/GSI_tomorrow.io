@@ -4064,7 +4064,7 @@ end subroutine qc_atms
 subroutine qc_tms(nchanl,is,ndat,nsig,npred,sea,land,ice,snow,mixed,luse,   &
                   zsges,cenlat,tbc,ptau5,emissivity_k,ts, &
                   pred,predchan,id_qc,aivals,errf,errf0,varinv, &
-                  error0,radmod)
+                  error0,cldeff_obs,cldeff_fg,radmod)
 
 !$$$ subprogram documentation block
 !               .      .    .
@@ -4077,6 +4077,7 @@ subroutine qc_tms(nchanl,is,ndat,nsig,npred,sea,land,ice,snow,mixed,luse,   &
 ! program history log:
 !     2024-08-28  eliu - initial 
 !     2025-10-20  xzhang - add actual qc 
+!     2026-10-09  xzhang - add the All-Sky Cloud & Heavy Scattering Check 
 !
 ! input argument list:
 !     nchanl       - number of channels per obs
@@ -4129,6 +4130,7 @@ subroutine qc_tms(nchanl,is,ndat,nsig,npred,sea,land,ice,snow,mixed,luse,   &
   real(r_kind),dimension(npred,nchanl),intent(in   ) :: pred,predchan
   real(r_kind),dimension(nchanl),      intent(inout) :: errf,errf0,varinv
   real(r_kind),dimension(nchanl),      intent(in   ) :: error0
+  real(r_kind),dimension(nchanl),      intent(in   ) ::cldeff_obs,cldeff_fg
   type(rad_obs_type),                  intent(in   ) :: radmod
 
 ! Declare local parameters
@@ -4161,7 +4163,9 @@ subroutine qc_tms(nchanl,is,ndat,nsig,npred,sea,land,ice,snow,mixed,luse,   &
   efact = one
   vfact = one
 
-  
+!-------------------------------------------------------------------
+! 1. Surface Type, Land/Ice Masking & Topography QC (Per-channel loop)
+!-------------------------------------------------------------------  
 
 ! QC applied for both clear and all-sky condition
 ! Remove surface channel overland,high peaking channel with snow
@@ -4189,10 +4193,12 @@ subroutine qc_tms(nchanl,is,ndat,nsig,npred,sea,land,ice,snow,mixed,luse,   &
       fact=zero
       if(id_qc(i) == igood_qc) id_qc(i)=ifail_imix_det
     end if
-     !    modified variances.
+
+    ! Apply surface mask factor
     errf(i)   = fact*errf(i)
     varinv(i) = fact*varinv(i)
 
+! Topography handling for Ch 9 (184.41 GHz moisture sounding level)
 ! Reduce q.c. bounds over higher topography
    if (zsges > r2000) then
       if(luse)aivals(11,is)= aivals(11,is) + one
@@ -4202,8 +4208,9 @@ subroutine qc_tms(nchanl,is,ndat,nsig,npred,sea,land,ice,snow,mixed,luse,   &
          errf(i)          = fact*errf(i)
       end if
    end if
-! Generate q.c. bounds and modified variances.
-!    Modify error based on transmittance at top of model
+
+! Transmittance scaling at top of model
+! Modify error based on transmittance at top of model
      varinv(i)=varinv(i)*ptau5(nsig,i)
      errf(i)=errf(i)*ptau5(nsig,i)
 
@@ -4223,8 +4230,34 @@ subroutine qc_tms(nchanl,is,ndat,nsig,npred,sea,land,ice,snow,mixed,luse,   &
      end if
   end do
 
-
 !  write(6,*)'emily checking QC to be impemented for TMS Tomorrow.io ...'
+
+!-------------------------------------------------------------------
+! 2. All-Sky Cloud & Heavy Scattering Check (Executed ONCE per FOV)
+!-------------------------------------------------------------------
+  if (radmod%lcloud_fwd .and. radmod%lprecip .and. sea) then
+
+    !calcalculate scattering index
+    !screen out channels 1 to 5, and 10 to 12 if channel 2 is affected by precipitation
+    ! for precipitating clouds over open water
+ 
+    write(6,*) 'Xiaoyan removing the extrem large omb_bc points'
+
+    if (cldeff_obs(2) > 20.0_r_kind .or. cldeff_fg(2) > 20.0_r_kind) then
+       efactmc=zero
+       vfactmc=zero
+       errf(1:5)=zero
+       varinv(1:5)=zero
+       do i=1,5
+          if(id_qc(i) == igood_qc)id_qc(i)=ifail_factch5_qc
+       end do
+       errf(10:12)=zero
+       varinv(10:12)=zero
+       do i=10,12
+          if(id_qc(i) == igood_qc)id_qc(i)=ifail_factch5_qc
+       end do
+     end if
+  end if
 
   return
 

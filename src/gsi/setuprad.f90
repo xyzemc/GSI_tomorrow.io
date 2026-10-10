@@ -1092,12 +1092,27 @@ contains
         kraintype=0
         cldeff_obs=zero 
         cldeff_fg=zero  
+
+        if (tms) then
+           call calc_scat_index_tms(tb_obs(1), tb_obs(2), tb_obs(12), ierrret, lsi, isi)
+
+           !only assimilate clear sky tms for HAFS
+           if (regional) then !clear sky screen
+              if (lsi < -33.0 .or. isi < -20.0) then
+                 varinv(1:6)=zero
+                 id_qc(1:6) = ifail_cloud_qc
+                 varinv(9:12)=zero
+                 id_qc(9:12) = ifail_cloud_qc
+               end if
+            end if
+        end if
+
         if(microwave .and. sea) then 
            if(radmod%lcloud_fwd .and. (amsua .or. atms .or. mws)) then
               call ret_amsua(tb_obs,nchanl,tsavg5,zasat,clw_obs,ierrret,scat=scat)
               scatp=scat
-            else if (tms) then
-              call calc_scat_index_tms(tb_obs(1), tb_obs(2), tb_obs(12), ierrret, lsi, isi)
+            !else if (tms) then
+            !  call calc_scat_index_tms(tb_obs(1), tb_obs(2), tb_obs(12), ierrret, lsi, isi)
               !if (lsi < -33.0 .or. isi < -1.0) then
               !    
               !end if
@@ -1556,7 +1571,7 @@ contains
            call qc_tms(nchanl,is,ndat,nsig,npred,sea,land,ice,snow,mixed,luse(n),   &
                        zsges,cenlat,tbc,ptau5,emissivity_k,ts, &
                        pred,predchan,id_qc,aivals,errf,errf0,varinv, &
-                       error0,radmod)
+                       error0,cldeff_obs,cldeff_fg,radmod)
 !<emily
 
 
