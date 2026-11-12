@@ -1096,9 +1096,9 @@ contains
         if (tms) then
            call calc_scat_index_tms(tb_obs(1), tb_obs(2), tb_obs(12), ierrret, lsi, isi)
 
-           !only assimilate clear sky tms for HAFS
-           if (regional) then !clear sky screen
-              if (lsi < -33.0 .or. isi < -20.0) then
+           ! Clear-sky screen: applied whenever TMS is not assimilated all-sky (HAFS)
+           if (.not. radmod%lcloud_fwd) then
+              if (ierrret /= 0 .or. lsi < -33.0 .or. isi < -20.0) then
                  varinv(1:6)=zero
                  id_qc(1:6) = ifail_cloud_qc
                  varinv(9:12)=zero
@@ -1772,6 +1772,13 @@ contains
                        errf(i) = min(three*errf(i),10.0_r_kind)
                     endif
                  else if(radmod%rtype == 'mws' .and. (i <= 7 .or. i>=17) ) then
+                    if (radmod%lprecip) then
+                       errf(i) = min(2.5_r_kind*errf(i),10.0_r_kind)
+                    else
+                       errf(i) = min(three*errf(i),10.0_r_kind)
+                    endif
+                 !else if(radmod%rtype == 'tms' .and. (i <= 5 .or. i>=10) ) then
+                 else if(radmod%rtype == 'tms') then !all 12 channels assimilated in all-sky
                     if (radmod%lprecip) then
                        errf(i) = min(2.5_r_kind*errf(i),10.0_r_kind)
                     else
