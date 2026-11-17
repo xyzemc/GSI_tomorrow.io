@@ -2211,7 +2211,8 @@ subroutine call_crtm(obstype,obstime,data_s,nchanl,nreal,ich, &
                    if(cloud_cont(k,ii) > 1.000_r_kind*1.0E-6_r_kind .and.  atmosphere(1)%cloud_fraction(k) < 1.001_r_kind*1.0E-5_r_kind) then
                      atmosphere(1)%cloud_fraction(k)=1.001_r_kind*1.0E-5_r_kind
                    end if
-                end do
+                 end do
+              end if
            end if
         endif
      endif
