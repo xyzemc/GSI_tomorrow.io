@@ -4243,7 +4243,7 @@ subroutine qc_tms(nchanl,is,ndat,nsig,npred,sea,land,ice,snow,mixed,luse,   &
  
     write(6,*) 'Xiaoyan removing the extrem large omb_bc points'
 
-    if ( (cldeff_obs(2)  >  20.0_r_kind .or. cldeff_fg(2)  >  20.0_r_kind) .and. &
+    if ( (cldeff_obs(2)  >  20.0_r_kind .or. cldeff_fg(2)  >  20.0_r_kind) .or. &
        (cldeff_obs(12) < -10.0_r_kind .or. cldeff_fg(12) < -10.0_r_kind) ) then
 
        efactmc=zero
